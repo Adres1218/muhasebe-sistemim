@@ -1,89 +1,150 @@
+<!-- index.html -->
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Welcome to Firebase Hosting</title>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Toptancı Muhasebe</title>
+  <script src="js/firebase-app-compat.js"></script>
+  <script src="js/firebase-firestore-compat.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 15px; background: #f8f9fa; }
+    .card { background: white; padding: 15px; margin: 10px 0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    input, select, button { padding: 8px; margin: 5px; width: 100%; box-sizing: border-box; }
+    button { background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    button:hover { opacity: 0.9; }
+    ul { list-style: none; padding: 0; }
+    li { padding: 10px; border-bottom: 1px solid #eee; }
+  </style>
+</head>
+<body>
+  <h2>📱 Toptancı Muhasebe (Firebase)</h2>
 
-    <!-- update the version number as needed -->
-    <script defer src="/__/firebase/12.3.0/firebase-app-compat.js"></script>
-    <!-- include only the Firebase features as you need -->
-    <script defer src="/__/firebase/12.3.0/firebase-auth-compat.js"></script>
-    <script defer src="/__/firebase/12.3.0/firebase-database-compat.js"></script>
-    <script defer src="/__/firebase/12.3.0/firebase-firestore-compat.js"></script>
-    <script defer src="/__/firebase/12.3.0/firebase-functions-compat.js"></script>
-    <script defer src="/__/firebase/12.3.0/firebase-messaging-compat.js"></script>
-    <script defer src="/__/firebase/12.3.0/firebase-storage-compat.js"></script>
-    <script defer src="/__/firebase/12.3.0/firebase-analytics-compat.js"></script>
-    <script defer src="/__/firebase/12.3.0/firebase-remote-config-compat.js"></script>
-    <script defer src="/__/firebase/12.3.0/firebase-performance-compat.js"></script>
-    <!-- 
-      initialize the SDK after all desired features are loaded, set useEmulator to false
-      to avoid connecting the SDK to running emulators.
-    -->
-    <script defer src="/__/firebase/init.js?useEmulator=true"></script>
+  <div class="card">
+    <h3>Müşteri Ekle</h3>
+    <input type="text" id="musteriAd" placeholder="Müşteri Adı">
+    <button onclick="musteriEkle()">Ekle</button>
+  </div>
 
-    <style media="screen">
-      body { background: #ECEFF1; color: rgba(0,0,0,0.87); font-family: Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; }
-      #message { background: white; max-width: 360px; margin: 100px auto 16px; padding: 32px 24px; border-radius: 3px; }
-      #message h2 { color: #ffa100; font-weight: bold; font-size: 16px; margin: 0 0 8px; }
-      #message h1 { font-size: 22px; font-weight: 300; color: rgba(0,0,0,0.6); margin: 0 0 16px;}
-      #message p { line-height: 140%; margin: 16px 0 24px; font-size: 14px; }
-      #message a { display: block; text-align: center; background: #039be5; text-transform: uppercase; text-decoration: none; color: white; padding: 16px; border-radius: 4px; }
-      #message, #message a { box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24); }
-      #load { color: rgba(0,0,0,0.4); text-align: center; font-size: 13px; }
-      @media (max-width: 600px) {
-        body, #message { margin-top: 0; background: white; box-shadow: none; }
-        body { border-top: 16px solid #ffa100; }
+  <div class="card">
+    <h3>Ürün Ekle</h3>
+    <input type="text" id="urunAd" placeholder="Ürün Adı">
+    <input type="number" id="urunFiyat" placeholder="Fiyat (₺)" step="0.01">
+    <button onclick="urunEkle()">Ekle</button>
+  </div>
+
+  <div class="card">
+    <h3>Satış Yap</h3>
+    <select id="musteriSec"></select>
+    <select id="urunSec"></select>
+    <input type="number" id="miktar" value="1" min="1">
+    <button onclick="satisYap()">Satış Yap</button>
+  </div>
+
+  <div class="card">
+    <h3>Müşteriler</h3>
+    <ul id="musteriListesi"></ul>
+  </div>
+
+  <!-- Firebase Config (BURAYA KENDİ BİLGİLERİNİ YAZ!) -->
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAi4OuARWBG_-YRYA3HfJC_v5a5i-TQ698",
+      authDomain: "muhasabe-edef5.firebaseapp.com",
+      projectId: "muhasabe-edef5",
+      storageBucket: "muhasabe-edef5.firebasestorage.app",
+      messagingSenderId: "780200310111",
+      appId: "1:780200310111:web:14f102cce06d47c98732ea",
+      measurementId: "G-QB1EH28VD7"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    db.enablePersistence().catch(err => console.log('Persistence error:', err));
+
+    // Dinamik yükleme
+    function yukle() {
+      // Müşteriler
+      db.collection("musteriler").onSnapshot(snap => {
+        const liste = document.getElementById("musteriListesi");
+        liste.innerHTML = "";
+        const musteriSelect = document.getElementById("musteriSec");
+        musteriSelect.innerHTML = "";
+        snap.forEach(doc => {
+          const d = doc.data();
+          const li = document.createElement("li");
+          li.textContent = `${d.ad} | Borç: ${d.borc?.toFixed(2) || 0} ₺`;
+          liste.appendChild(li);
+
+          const opt = document.createElement("option");
+          opt.value = doc.id;
+          opt.textContent = d.ad;
+          musteriSelect.appendChild(opt);
+        });
+      });
+
+      // Ürünler
+      db.collection("urunler").onSnapshot(snap => {
+        const urunSelect = document.getElementById("urunSec");
+        urunSelect.innerHTML = "";
+        snap.forEach(doc => {
+          const d = doc.data();
+          const opt = document.createElement("option");
+          opt.value = doc.id;
+          opt.textContent = `${d.ad} (${d.fiyat?.toFixed(2)} ₺)`;
+          urunSelect.appendChild(opt);
+        });
+      });
+    }
+
+    function musteriEkle() {
+      const ad = document.getElementById("musteriAd").value.trim();
+      if (ad) {
+        db.collection("musteriler").add({ ad, borc: 0, tarih: firebase.firestore.FieldValue.serverTimestamp() });
+        document.getElementById("musteriAd").value = "";
       }
-    </style>
-  </head>
-  <body>
-    <div id="message">
-      <h2>Welcome</h2>
-      <h1>Firebase Hosting Setup Complete</h1>
-      <p>You're seeing this because you've successfully setup Firebase Hosting. Now it's time to go build something extraordinary!</p>
-      <a target="_blank" href="https://firebase.google.com/docs/hosting/">Open Hosting Documentation</a>
-    </div>
-    <p id="load">Firebase SDK Loading&hellip;</p>
+    }
 
-    <script>
-      document.addEventListener('DOMContentLoaded', function() {
-        const loadEl = document.querySelector('#load');
-        // // 🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥
-        // // The Firebase SDK is initialized and available here!
-        //
-        // firebase.auth().onAuthStateChanged(user => { });
-        // firebase.database().ref('/path/to/ref').on('value', snapshot => { });
-        // firebase.firestore().doc('/foo/bar').get().then(() => { });
-        // firebase.functions().httpsCallable('yourFunction')().then(() => { });
-        // firebase.messaging().requestPermission().then(() => { });
-        // firebase.storage().ref('/path/to/ref').getDownloadURL().then(() => { });
-        // firebase.analytics(); // call to activate
-        // firebase.analytics().logEvent('tutorial_completed');
-        // firebase.performance(); // call to activate
-        //
-        // // 🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥
+    function urunEkle() {
+      const ad = document.getElementById("urunAd").value.trim();
+      const fiyat = parseFloat(document.getElementById("urunFiyat").value);
+      if (ad && !isNaN(fiyat)) {
+        db.collection("urunler").add({ ad, fiyat, stok: 0 });
+        document.getElementById("urunAd").value = "";
+        document.getElementById("urunFiyat").value = "";
+      }
+    }
 
-        try {
-          let app = firebase.app();
-          let features = [
-            'auth', 
-            'database', 
-            'firestore',
-            'functions',
-            'messaging', 
-            'storage', 
-            'analytics', 
-            'remoteConfig',
-            'performance',
-          ].filter(feature => typeof app[feature] === 'function');
-          loadEl.textContent = `Firebase SDK loaded with ${features.join(', ')}`;
-        } catch (e) {
-          console.error(e);
-          loadEl.textContent = 'Error loading the Firebase SDK, check the console.';
+    function satisYap() {
+      const musteriId = document.getElementById("musteriSec").value;
+      const urunId = document.getElementById("urunSec").value;
+      const miktar = parseInt(document.getElementById("miktar").value) || 1;
+
+      if (!musteriId || !urunId) return alert("Seçim yapın!");
+
+      // Ürün fiyatını al
+      db.collection("urunler").doc(urunId).get().then(doc => {
+        if (doc.exists) {
+          const fiyat = doc.data().fiyat;
+          const tutar = fiyat * miktar;
+          db.collection("hareketler").add({
+            musteri_id: musteriId,
+            urun_id: urunId,
+            miktar: miktar,
+            tutar: tutar,
+            tur: "Satis",
+            tarih: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          // Borcu güncelle
+          db.collection("musteriler").doc(musteriId).update({
+            borc: firebase.firestore.FieldValue.increment(tutar)
+          });
+          document.getElementById("miktar").value = "1";
         }
       });
-    </script>
-  </body>
+    }
+
+    yukle();
+  </script>
+</body>
 </html>
